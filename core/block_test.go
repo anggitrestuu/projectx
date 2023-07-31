@@ -1,86 +1,50 @@
 package core
 
 import (
-	"bytes"
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/anggitrestuu/projectx/crypto"
 	"github.com/anggitrestuu/projectx/types"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHeader(t *testing.T) {
-	h := &Header{
-		Version:   1,
-		PrevBlock: types.RandomHash(),
-		Timestamp: uint64(time.Now().UnixNano()),
-		Height:    10,
-		Nonce:     989394,
+func randomBlock(height uint32) *Block {
+	header := &Header{
+		Version:       1,
+		PrevBlockHash: types.RandomHash(),
+		Height:        height,
+		Timestamp:     uint64(time.Now().UnixNano()),
 	}
 
-	buf := &bytes.Buffer{}
-	assert.Nil(t, h.EncodeBinary(buf))
+	tx := Transaction{
+		Data: []byte("hello world"),
+	}
 
-	hDecode := &Header{}
-	assert.Nil(t, hDecode.DecodeBinary(buf))
-	assert.Equal(t, h, hDecode)
+	return NewBlock(header, []Transaction{tx})
 
 }
 
-func TestHeaderEncodeDecode(t *testing.T) {
-	h := &Header{
-		Version:   1,
-		PrevBlock: types.RandomHash(),
-		Timestamp: uint64(time.Now().UnixNano()),
-		Height:    10,
-		Nonce:     989394,
-	}
+func TestSignBlock(t *testing.T) {
+	privKey := crypto.GeneratePrivateKey()
+	block := randomBlock(0)
 
-	buff := &bytes.Buffer{}
-	assert.Nil(t, h.EncodeBinary(buff))
-
-	hDecode := &Header{}
-	assert.Nil(t, hDecode.DecodeBinary(buff))
-	assert.Equal(t, h, hDecode)
-	fmt.Printf("%+v\n", hDecode)
+	assert.Nil(t, block.Sign(privKey))
+	assert.NotNil(t, block.Signature)
 }
 
-func TestBlockEncodeDecode(t *testing.T) {
-	h := &Block{
-		Header: Header{
-			Version:   1,
-			PrevBlock: types.RandomHash(),
-			Timestamp: uint64(time.Now().UnixNano()),
-			Height:    10,
-			Nonce:     989394,
-		},
-		Transactions: nil,
-	}
+func TestVerifyBlock(t *testing.T) {
+	privKey := crypto.GeneratePrivateKey()
+	block := randomBlock(0)
 
-	buff := &bytes.Buffer{}
-	assert.Nil(t, h.EncodeBinary(buff))
+	assert.Nil(t, block.Sign(privKey))
+	assert.Nil(t, block.Verify())
 
-	hDecode := &Block{}
-	assert.Nil(t, hDecode.DecodeBinary(buff))
-	assert.Equal(t, h, hDecode)
-	fmt.Printf("%+v\n", hDecode)
+	otherPrivKey := crypto.GeneratePrivateKey()
+	block.Validator = otherPrivKey.PublicKey()
+	// should fail because the public key is not the same
+	assert.NotNil(t, block.Verify())
 
-}
-
-func TestBlockHash(t *testing.T) {
-	b := &Block{
-		Header: Header{
-			Version:   1,
-			PrevBlock: types.RandomHash(),
-			Timestamp: uint64(time.Now().UnixNano()),
-			Height:    10,
-			Nonce:     989394,
-		},
-		Transactions: nil,
-	}
-
-	hash := b.Hash()
-	fmt.Printf("%x\n", hash)
-	assert.Equal(t, hash, b.Hash())
+	block.Height = 100
+	assert.NotNil(t, block.Verify())
 }
